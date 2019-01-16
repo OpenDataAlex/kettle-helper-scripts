@@ -21,21 +21,24 @@ PDI_LOG_HOME="/path/to/store/log/"
 
 #PARAMETERS - don't change these...
 CURRENT_TIME=`date +"%Y_%m_%d_%H_%M_%S"`
-LOG_FILE_PATH_BASE=$(echo $PROCESS | cut -f1 -d.)
+LOG_FILE_PATH_BASE=$(echo $PROCESS | cut -f1 -d .)
 LOG_FILE_NAME_BASE=$(echo ${LOG_FILE_PATH_BASE##*/})
+PROCESS_TYPE_LIST="trans, transformation, job"
 TOUCH_FILE=${PDI_LOG_HOME}/touchfiles/${LOG_FILE_NAME_BASE}.touch
 
 
 #Debugging lines.
 #echo "Log file path base is: ${LOG_FILE_PATH_BASE}"
-#echo "Log file name base is: ${LOG_FILE_NAME_BASE}"
 #echo "Touch file is: ${TOUCH_FILE}"
 
 #Are we trying to run a job or transformation?
 if [[ $PROCESS_TYPE == "trans" ]] || [[ $PROCESS_TYPE == "transformation" ]]; then
    EXECUTE_PROCESS=pan.sh
-else
+elif [[ $PROCESS_TYPE == "job" ]]; then
    EXECUTE_PROCESS=kitchen.sh
+else
+   echo 'ERROR - Process type must be one of the following: ' $PROCESS_TYPE_LIST
+   exit
 fi
 
 cd $PDI_HOME
@@ -50,8 +53,25 @@ mkdir -p $PDI_LOG_HOME/touchfiles
 
 if [ ! -f $TOUCH_FILE ]; then
     touch $TOUCH_FILE
-	
+
 	sh $EXECUTE_PROCESS /file:$PDI_CODE_HOME/$PROCESS $PARAMETERS > $PDI_LOG_HOME/$LOG_FILE_PATH_BASE/${LOG_FILE_NAME_BASE}_${CURRENT_TIME}.log
+	rm $TOUCH_FILE
+else
+	#echo 'Found the touchfile...'
+	#echo $TOUCH_FILE
+
+	NUM_PROCS=$( ps -ef | grep "${PROCESS}" | wc -l)
+
+	echo 'ERROR - There is a touch file preventing this process from kicking off.'
+
+	if [ "$NUM_PROCS" -ge 1 ]; then
+
+		echo 'ERROR - It appears the process is still running.'
+
+	else
+
+		echo 'ERROR - It appears the touchfile did not get deleted and the process is not running.'
+
+	fi
 fi
 
-rm $TOUCH_FILE
